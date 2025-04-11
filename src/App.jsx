@@ -1,84 +1,54 @@
-import React, { useState } from 'react'
-
-const produits = {
-  "Butler": 120,
-  "Solopaque": 140,
-  "Screen 3%": 130,
-  "Screen 5%": 135
-};
+import React, { useState, useEffect } from 'react'
+import Papa from 'papaparse'
 
 export default function App() {
-  const [client, setClient] = useState({ nom: '', tel: '', adresse: '' });
-  const [produit, setProduit] = useState("Butler");
-  const [largeur, setLargeur] = useState('');
-  const [hauteur, setHauteur] = useState('');
-  const [motorisation, setMotorisation] = useState('');
-  const [escomptes, setEscomptes] = useState({
-    "Butler": 53,
-    "Solopaque": 53,
-    "Screen 3%": 53,
-    "Screen 5%": 53
-  });
-  const [showEscompteModal, setShowEscompteModal] = useState(false);
+  const [prixButler, setPrixButler] = useState([])
+  const [largeur, setLargeur] = useState('')
+  const [hauteur, setHauteur] = useState('')
+  const [escompte, setEscompte] = useState(53)
+  const [prixTrouvé, setPrixTrouvé] = useState(null)
 
-  const prixListe = produits[produit] || 0;
-  const escompte = escomptes[produit];
-  const prixCoutant = prixListe * (1 - escompte / 100);
-  const prixVente = prixCoutant + parseFloat(motorisation || 0);
+  useEffect(() => {
+    fetch('/data/prix-faber-butler.csv')
+      .then(res => res.text())
+      .then(data => {
+        Papa.parse(data, {
+          header: true,
+          skipEmptyLines: true,
+          complete: result => {
+            setPrixButler(result.data)
+          }
+        })
+      })
+  }, [])
 
-  const handleEscompteChange = (prod, val) => {
-    setEscomptes({ ...escomptes, [prod]: parseFloat(val) });
-  };
+  const calculerPrix = () => {
+    const l = parseInt(largeur)
+    const h = parseInt(hauteur)
+    const match = prixButler.find(p => parseInt(p.Largeur) === l && parseInt(p.Hauteur) === h)
+    if (match) {
+      const prixBase = parseFloat(match.Prix)
+      const prixFinal = prixBase * (1 - escompte / 100)
+      setPrixTrouvé(prixFinal.toFixed(2))
+    } else {
+      setPrixTrouvé("Dimensions non trouvées")
+    }
+  }
 
   return (
     <div style={{ padding: 40 }}>
-      <h1>Soumission - Le Storiste</h1>
-
-      <h2>Client</h2>
-      <input placeholder="Nom*" value={client.nom} onChange={e => setClient({ ...client, nom: e.target.value })} /><br />
-      <input placeholder="Téléphone*" value={client.tel} onChange={e => setClient({ ...client, tel: e.target.value })} /><br />
-      <input placeholder="Adresse*" value={client.adresse} onChange={e => setClient({ ...client, adresse: e.target.value })} /><br />
-
-      <h2>Produit</h2>
-      <label>Produit :
-        <select value={produit} onChange={e => setProduit(e.target.value)}>
-          {Object.keys(produits).map(p => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
-      </label><br />
+      <h1>Test Butler - Grille dynamique CSV</h1>
       <label>Largeur :
         <input value={largeur} onChange={e => setLargeur(e.target.value)} />
       </label><br />
       <label>Hauteur :
         <input value={hauteur} onChange={e => setHauteur(e.target.value)} />
       </label><br />
-      <label>Motorisation ($) :
-        <input value={motorisation} onChange={e => setMotorisation(e.target.value)} />
+      <label>Escompte (%) :
+        <input value={escompte} onChange={e => setEscompte(e.target.value)} />
       </label><br />
-
-      <button onClick={() => setShowEscompteModal(true)}>⚙️ Ajuster les escomptes</button>
-
-      {showEscompteModal && (
-        <div style={{ background: '#eee', padding: 20, marginTop: 20 }}>
-          <h3>Modifier les escomptes</h3>
-          {Object.keys(produits).map(p => (
-            <div key={p}>
-              <label>{p} : </label>
-              <input
-                value={escomptes[p]}
-                onChange={e => handleEscompteChange(p, e.target.value)}
-              /> %
-            </div>
-          ))}
-          <button onClick={() => setShowEscompteModal(false)}>Fermer</button>
-        </div>
-      )}
-
-      <h2>Prix</h2>
-      <p>Prix liste : <strong>{prixListe.toFixed(2)} $</strong></p>
-      <p>Prix coûtant : <strong>{prixCoutant.toFixed(2)} $</strong></p>
-      <p>Prix vente (avec options) : <strong>{prixVente.toFixed(2)} $</strong></p>
+      <button onClick={calculerPrix}>Calculer prix</button>
+      <h3>Prix trouvé : {prixTrouvé !== null ? `${prixTrouvé} $` : "—"}</h3>
     </div>
   )
 }
